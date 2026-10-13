@@ -1,0 +1,14 @@
+# Zeek output
+zeek/logs/*
+!zeek/logs/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+
+# Captures, if you dump any
+*.pcap
+*.pcapng
+
+# OS
+.DS_Store
