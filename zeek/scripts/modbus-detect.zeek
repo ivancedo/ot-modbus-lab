@@ -22,7 +22,7 @@ export {
 
 	# Set this to your HMI/poller's address. Traffic from any other
 	# source issuing a Modbus write trips Unauthorized_Modbus_Write.
-	const known_engineering_hosts: set[addr] = { 172.20.0.11/32 } &redef;
+	const known_engineering_hosts: set[addr] = { 172.20.0.11 } &redef;
 
 	# Requests-per-source in the SumStats window before it is a flood.
 	const flood_threshold: double = 100.0 &redef;
