@@ -53,7 +53,7 @@ services:
       - ./zeek/local.zeek:/usr/local/zeek/share/zeek/site/local.zeek:ro
       - ./zeek/scripts:/usr/local/zeek/share/zeek/site/scripts:ro
     working_dir: /logs
-    command: ["zeek", "-C", "-i", "br-otlab", "local"]   # -C: ignore bad checksums from veth offload
+    command: ["zeek", "-C", "-i", "br-otlab", "local"]
     depends_on:
       - modbus-master
       - modbus-slave
