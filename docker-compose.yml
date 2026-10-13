@@ -1,32 +1,32 @@
 networks:
   otlab:
     driver: bridge
-    internal: true                      # no outbound internet for the lab containers
+    internal: true
     driver_opts:
-      com.docker.network.bridge.name: br-otlab   # fixed name so Zeek knows what to sniff
+      com.docker.network.bridge.name: br-otlab
     ipam:
       config:
         - subnet: 172.20.0.0/24
 
 services:
-  plc-server:
-    build: ./server
-    container_name: plc-server
-    hostname: plc-server
+  modbus-master:
+    build: ./master
+    container_name: modbus-master
+    hostname: mobus-master
     networks:
       otlab:
         ipv4_address: 172.20.0.10
     restart: unless-stopped
 
-  hmi-client:
-    build: ./client
-    container_name: hmi-client
-    hostname: hmi-client
+  modbus-slave:
+    build: ./slave
+    container_name: modbus-slave
+    hostname: modbus-slave
     networks:
       otlab:
         ipv4_address: 172.20.0.11
     depends_on:
-      - plc-server
+      - modbus-master
     restart: unless-stopped
 
   attacker:
@@ -37,14 +37,14 @@ services:
       otlab:
         ipv4_address: 172.20.0.12
     depends_on:
-      - plc-server
-    tty: true                           # keep it alive for `docker exec` attack runs
+      - modbus-master
+    tty: true
     stdin_open: true
 
   zeek:
-    image: zeek/zeek:latest             # pull once on the Pi and check the tag supports arm64
+    image: zeek/zeek:latest
     container_name: zeek
-    network_mode: host                  # must see br-otlab, not just its own veth
+    network_mode: host
     cap_add:
       - NET_RAW
       - NET_ADMIN
@@ -55,6 +55,6 @@ services:
     working_dir: /logs
     command: ["zeek", "-C", "-i", "br-otlab", "local"]   # -C: ignore bad checksums from veth offload
     depends_on:
-      - plc-server
-      - hmi-client
+      - modbus-master
+      - modbus-slave
     restart: unless-stopped
