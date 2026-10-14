@@ -20,18 +20,27 @@ POLL_INTERVAL_SEC = 2  # fixed scan cycle; change this to study interval-drift d
 
 
 def poll_once(client: ModbusTcpClient) -> None:
-    # read input register 0 (simulated temperature)
-    rr_ir = client.read_input_registers(0, 1)
+    # read input registers 0-1 (tank level x10, flow rate L/min)
+    rr_ir = client.read_input_registers(0, 2)
+    # read discrete inputs 0-1 (low-level switch, high-level switch)
+    rr_di = client.read_discrete_inputs(0, 2)
     # read coil 0 (pump state)
     rr_co = client.read_coils(0, 1)
 
-    if rr_ir.isError() or rr_co.isError():
-        log.warning("Poll error: ir=%s co=%s", rr_ir, rr_co)
+    if rr_ir.isError() or rr_di.isError() or rr_co.isError():
+        log.warning("Poll error: ir=%s di=%s co=%s", rr_ir, rr_di, rr_co)
         return
 
-    temp = rr_ir.registers[0] / 10.0
+    level = rr_ir.registers[0] / 10.0
+    flow = rr_ir.registers[1]
+    low_switch = rr_di.bits[0]
+    high_switch = rr_di.bits[1]
     pump = rr_co.bits[0]
-    log.info("temp=%.1fC pump=%s", temp, pump)
+
+    log.info(
+        "level=%.1f%% flow=%dL/min pump=%s low_switch=%s high_switch=%s",
+        level, flow, pump, low_switch, high_switch,
+    )
 
 
 def main() -> None:
