@@ -47,7 +47,7 @@ often) rather than signature-based - a good first lesson for OT NSM.
 ## Quick start
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/ivancedo/ot-modbus-lab
 cd ot-modbus-lab
 docker compose up -d --build
 ```
