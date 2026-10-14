@@ -9,24 +9,24 @@ networks:
         - subnet: 172.20.0.0/24
 
 services:
-  modbus-master:
-    build: ./master
-    container_name: modbus-master
-    hostname: mobus-master
+  modbus-slave:
+    build: ./slave
+    container_name: modbus-slave
+    hostname: mobus-slave
     networks:
       otlab:
         ipv4_address: 172.20.0.10
     restart: unless-stopped
 
-  modbus-slave:
-    build: ./slave
-    container_name: modbus-slave
-    hostname: modbus-slave
+  modbus-master:
+    build: ./master
+    container_name: modbus-master
+    hostname: modbus-master
     networks:
       otlab:
         ipv4_address: 172.20.0.11
     depends_on:
-      - modbus-master
+      - modbus-slave
     restart: unless-stopped
 
   attacker:
@@ -37,7 +37,7 @@ services:
       otlab:
         ipv4_address: 172.20.0.12
     depends_on:
-      - modbus-master
+      - modbus-slave
     tty: true
     stdin_open: true
 

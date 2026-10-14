@@ -6,7 +6,7 @@ detecting them with Zeek. Four containers on an isolated Docker bridge:
 ```
             br-otlab (172.20.0.0/24, internal)
 ┌──────────────┐  Modbus/TCP   ┌──────────────┐
-│  hmi-client  │──────────────▶│  plc-server  │
+│    master    │──────────────▶│    slave     │
 │ 172.20.0.11  │   port 502    │ 172.20.0.10  │
 └──────────────┘               └──────────────┘
        ▲                              ▲
@@ -21,9 +21,9 @@ detecting them with Zeek. Four containers on an isolated Docker bridge:
 └──────────────┘
 ```
 
-- **plc-server**: `pymodbus` Modbus/TCP server simulating a PLC (coils,
+- **slave**: `pymodbus` Modbus/TCP server simulating a PLC (coils,
   discrete inputs, holding/input registers).
-- **hmi-client**: benign poller, reads the PLC every 2s like a real HMI
+- **master**: benign poller, reads the PLC every 2s like a real HMI
   scan cycle. This is the traffic baseline.
 - **attacker**: idle container with ready-made attack scripts, run
   on-demand via `docker exec`.
@@ -55,7 +55,7 @@ docker compose up -d --build
 Check the HMI is polling and the PLC is responding:
 
 ```bash
-docker compose logs -f hmi-client
+docker compose logs -f modbus-master
 ```
 
 Check Zeek is seeing traffic:

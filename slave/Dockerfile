@@ -1,8 +1,11 @@
 FROM python:3.12-slim
 
+# pymodbus>=3.6 ships an asyncio server; pin a known-good version for reproducibility
 RUN pip install --no-cache-dir pymodbus==3.6.9
 
 WORKDIR /app
-COPY hmi_poller.py .
+COPY plc_server.py .
 
-CMD ["python", "hmi_poller.py"]
+EXPOSE 502/tcp
+
+CMD ["python", "plc_server.py"]
