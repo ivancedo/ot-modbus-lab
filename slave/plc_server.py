@@ -46,12 +46,12 @@ def build_context() -> tuple[ModbusServerContext, ModbusSlaveContext]:
         ir = ModbusSequentialDataBlock(0, [0] * 100)
     )
 
-    store.setValues(1, 0, [1])     # CO0: pump = ON
-    store.setValues(3, 0, [500])   # HR0: setpoint = 50.0%
-    store.setValues(4, 0, [250])   # IR0: tank level = 25.0%
-    store.setValues(4, 1, [0])     # IR1: flow rate = 0 L/min
-    store.setValues(2, 0, [0])     # DI0: low-level switch = clear
-    store.setValues(2, 1, [0])     # DI1: high-level switch = clear
+    store.setValues(1, 0, [1])      # CO0: pump = ON
+    store.setValues(3, 0, [500])    # HR0: setpoint = 50.0%
+    store.setValues(4, 0, [1])      # IR0: tank level = 1.0%
+    store.setValues(4, 1, [0])      # IR1: flow rate = 0 L/min
+    store.setValues(2, 0, [0])      # DI0: low-level switch = clear
+    store.setValues(2, 1, [0])      # DI1: high-level switch = clear
 
     context = ModbusServerContext(slaves=store, single=True)
     return context, store
@@ -59,7 +59,7 @@ def build_context() -> tuple[ModbusServerContext, ModbusSlaveContext]:
 
 def build_identity() -> ModbusDeviceIdentification:
     identity = ModbusDeviceIdentification()
-    identity.VendorName = "OT-Lab"
+    identity.VendorName = "Simulated PLCs Inc."
     identity.ProductCode = "SIM-PLC"
     identity.ProductName = "Simulated Modbus PLC"
     identity.ModelName = "pymodbus-lab"
@@ -80,13 +80,13 @@ async def simulate_process(store: ModbusSlaveContext) -> None:
         level += FILL_RATE_PCT_S if pump_on else -DRAIN_RATE_PCT_S
         level = max(0.0, min(100.0, level))
 
-        flow = 50 if pump_on else 0  # crude proxy, L/min
+        flow = 10 if pump_on else 0  # crude proxy, L/min
 
-        store.setValues(4, 0, [int(level * 10)])  # IR0: level x10
-        store.setValues(4, 1, [flow])             # IR1: flow rate
+        store.setValues(4, 0, [int(level * 10)])    # IR0: level x10
+        store.setValues(4, 1, [flow])               # IR1: flow rate
 
-        store.setValues(2, 0, [1 if level < LOW_LEVEL_PCT else 0])   # DI0
-        store.setValues(2, 1, [1 if level > HIGH_LEVEL_PCT else 0])  # DI1
+        store.setValues(2, 0, [1 if level < LOW_LEVEL_PCT else 0])  # DI0
+        store.setValues(2, 1, [1 if level > HIGH_LEVEL_PCT else 0]) # DI1
 
         await asyncio.sleep(TICK_SECONDS)
 
