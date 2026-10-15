@@ -14,8 +14,8 @@ log = logging.getLogger("plc-server")
 
 LOW_LEVEL_PCT = 10.0    # Low level alarm threshold (%)
 HIGH_LEVEL_PCT = 90.0   # High level alarm threshold (%)
-FILL_RATE_PCT_S = 0.5   # Net inflow when the pump is ON (%/s)
-DRAIN_RATE_PCT_S = 0.2  # Outflow when the pump is OFF (%/s)
+PUMP_FILL_PCT_S = 0.5   # Inflow when the pump is ON (%/s)
+FAUCET_DRAIN_PCT_S = 0.3  # Outflow when the faucet is ON (%/s)
 TICK_SECONDS = 1        # Simulation time step (s)
 
 
@@ -29,11 +29,12 @@ def build_context() -> tuple[ModbusServerContext, ModbusSlaveContext]:
     )
 
     # Set initial values
-    store.setValues(1, 0, [1])      # Pump ON on startup
-    store.setValues(4, 0, [1])      # Tank level dummy value on startup
+    store.setValues(1, 0, [0])      # Pump OFF on startup
+    store.setValues(1, 1, [0])      # Faucet OFF on startup
+    store.setValues(4, 0, [500])    # Tank level 50% on startup
     store.setValues(4, 1, [0])      # Water flow dummy value on startup
     store.setValues(2, 0, [0])      # Low alarm OFF on startup
-    store.setValues(2, 1, [0])      # High alarm OFF on startup 
+    store.setValues(2, 1, [0])      # High alarm OFF on startup
 
     context = ModbusServerContext(slaves=store, single=True)
     return context, store
@@ -51,21 +52,22 @@ def build_identity() -> ModbusDeviceIdentification:
 
 
 async def simulate_process(store: ModbusSlaveContext) -> None:
-    level = 11.0
+    level = 50.0
     while True:
-        # Read CO0 and gets if pump is ON/OFF
+        # Read CO0/CO1 and get if the pump and faucet are ON/OFF
         pump_on = bool(store.getValues(1, 0, count=1)[0])
+        faucet_on = bool(store.getValues(1, 1, count=1)[0])
 
-        # Adjust the tank level depending on the pump's state
-        level += FILL_RATE_PCT_S if pump_on else -DRAIN_RATE_PCT_S
+        # Net flow rate = inflow - outflow (%/s, may be negative)
+        rate = (PUMP_FILL_PCT_S if pump_on else 0.0) - (FAUCET_DRAIN_PCT_S if faucet_on else 0.0)
+
+        # Adjust the tank level with the net rate over this tick
+        level += rate * TICK_SECONDS
         level = max(0.0, min(100.0, level))
 
-        # Calculate the flow depending on the pump's state
-        flow = 10 if pump_on else 0
-
-        # Set the new values
+        # Set the new values (level as 0.1%, flow rate as signed 0.01%/s)
         store.setValues(4, 0, [int(level * 10)])
-        store.setValues(4, 1, [flow])
+        store.setValues(4, 1, [int(round(rate * 100)) & 0xFFFF])
         store.setValues(2, 0, [1 if level < LOW_LEVEL_PCT else 0])
         store.setValues(2, 1, [1 if level > HIGH_LEVEL_PCT else 0])
 
