@@ -5,8 +5,12 @@ import time
 
 from pymodbus.client import ModbusTcpClient
 
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("hmi-client")
+# Professional log format shared by every component: wall-clock timestamp,
+# fixed-width level, logger name, then the message.
+LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-11s | %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, datefmt=DATE_FORMAT)
+log = logging.getLogger("hmi.poll")
 
 PLC_HOST = "172.20.0.10"    # MODBUS/TCP server address
 PLC_PORT = 502              # MODBUS/TCP port
@@ -43,17 +47,20 @@ def poll_once(client: ModbusTcpClient) -> None:
         log.warning("Poll error: ir=%s di=%s co=%s", rr_ir, rr_di, rr_co)
         return
 
-    # Calculate real values
+    # Calculate real values (flow is a 16-bit signed value in 0.01%/s)
     level = rr_ir.registers[0] / 10.0
-    flow = rr_ir.registers[1]
+    raw_flow = rr_ir.registers[1]
+    if raw_flow >= 32768:
+        raw_flow -= 65536
+    flow = raw_flow / 100.0
     low_switch = rr_di.bits[0]
     high_switch = rr_di.bits[1]
     pump = rr_co.bits[0]
 
     # Log the real values
     log.info(
-        "level=%.1f%% flow=%dL/min pump=%s low_switch=%s high_switch=%s",
-        level, flow, pump, low_switch, high_switch,
+        "level=%5.1f%% flow=%+6.2f%%/s pump=%-3s low=%d high=%d",
+        level, flow, "ON" if pump else "OFF", int(low_switch), int(high_switch),
     )
 
 

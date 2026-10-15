@@ -4,8 +4,18 @@ import threading
 from flask import Flask, jsonify, render_template_string, request
 from pymodbus.client import ModbusTcpClient
 
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("hmi-web")
+# Professional log format shared by every component: wall-clock timestamp,
+# fixed-width level, logger name, then the message.
+LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-11s | %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, datefmt=DATE_FORMAT)
+
+# The werkzeug dev server logs one access line per request. The browser polls
+# /api/state every 2s, which otherwise drowns the log. Keep only warnings/errors
+# (4xx/5xx) from it; our own handlers log the events that actually matter.
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
+log = logging.getLogger("hmi.web")
 
 PLC_HOST = "172.20.0.10"    # MODBUS/TCP server address
 PLC_PORT = 502              # MODBUS/TCP port
@@ -15,6 +25,19 @@ TANK_CAPACITY_L = 1000      # Tank capacity, for % <-> litres conversion
 app = Flask(__name__)
 client = ModbusTcpClient(PLC_HOST, port=PLC_PORT)
 lock = threading.Lock()     # Guards the shared Modbus client
+_plc_online = None          # Tracks PLC link state so we only log on change
+
+
+def _set_plc_online(online: bool, detail: str = "") -> None:
+    # Log PLC link up/down transitions once, not on every poll.
+    global _plc_online
+    if online != _plc_online:
+        if online:
+            log.info("PLC link UP (%s:%d)", PLC_HOST, PLC_PORT)
+        else:
+            log.error("PLC link DOWN (%s:%d)%s", PLC_HOST, PLC_PORT,
+                      f": {detail}" if detail else "")
+        _plc_online = online
 
 
 PAGE = """
@@ -162,13 +185,19 @@ def index():
 def state():
     # Read IR0, IR1, DI0, DI1 and CO0, CO1 (one HMI scan)
     with lock:
-        client.connect()
+        if not client.connect():
+            _set_plc_online(False, "connect failed")
+            return jsonify(error="PLC unreachable"), 502
         rr_ir = client.read_input_registers(0, 2)
         rr_di = client.read_discrete_inputs(0, 2)
         rr_co = client.read_coils(0, 2)
 
     if rr_ir.isError() or rr_di.isError() or rr_co.isError():
+        _set_plc_online(False, "read error")
+        log.warning("PLC read error: ir=%s di=%s co=%s", rr_ir, rr_di, rr_co)
         return jsonify(error="PLC read error"), 502
+
+    _set_plc_online(True)
 
     # Flow rate is a 16-bit signed value in 0.01%/s (negative = net draining)
     raw_flow = rr_ir.registers[1]
@@ -190,16 +219,35 @@ def state():
     )
 
 
+COIL_NAMES = {0: "PUMP", 1: "FAUCET"}
+
+
 @app.route("/api/coil/<int:addr>", methods=["POST"])
 def set_coil(addr):
     # Turn a coil ON/OFF: CO0 = pump, CO1 = faucet
     on = bool(request.json.get("on", False))
+    name = COIL_NAMES.get(addr, f"CO{addr}")
+    src = request.remote_addr or "?"
     with lock:
-        client.connect()
-        client.write_coil(addr, on)
-    log.info("Operator command: coil %d = %s", addr, "ON" if on else "OFF")
+        if not client.connect():
+            _set_plc_online(False, "connect failed")
+            log.error("Operator command FAILED (PLC unreachable): %s -> %s",
+                      name, "ON" if on else "OFF")
+            return jsonify(error="PLC unreachable"), 502
+        rq = client.write_coil(addr, on)
+    if rq.isError():
+        log.error("Operator command FAILED: %s -> %s (%s)",
+                  name, "ON" if on else "OFF", rq)
+        return jsonify(error="write failed"), 502
+    log.info("Operator command: %s -> %s  (coil %d, from %s)",
+             name, "ON" if on else "OFF", addr, src)
     return jsonify(ok=True)
 
 
 if __name__ == "__main__":
+    log.info("=" * 60)
+    log.info("Water-Tank HMI  (web control panel)")
+    log.info("  serving on http://0.0.0.0:%d", WEB_PORT)
+    log.info("  PLC backend %s:%d  (Modbus/TCP)", PLC_HOST, PLC_PORT)
+    log.info("=" * 60)
     app.run(host="0.0.0.0", port=WEB_PORT)
