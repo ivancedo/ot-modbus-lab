@@ -1,5 +1,5 @@
-zeek/logs/*
-!zeek/logs/.gitkeep
+detection/zeek/logs/*
+!detection/zeek/logs/.gitkeep
 
 __pycache__/
 *.pyc

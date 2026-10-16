@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Batch Line - Process Overview</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <div>
+        <h1>Batch Line</h1>
+        <p>Modbus/TCP process overview</p>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="playBtn" class="btn primary">Pause</button>
+      <button id="resetBtn" class="btn">Reset</button>
+      <label class="speed">
+        Speed
+        <select id="speedSel">
+          <option value="1000">1&times;</option>
+          <option value="500">2&times;</option>
+          <option value="250">4&times;</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <!-- Master state machine: the recipe the controller walks through -->
+  <section class="recipe" aria-label="Controller state">
+    <div class="recipe-steps" id="recipeSteps">
+      <div class="step" data-state="IDLE"><span>1</span>Load</div>
+      <div class="step" data-state="HEATING"><span>2</span>Heat</div>
+      <div class="step" data-state="PRESSURIZING"><span>3</span>Pressurise</div>
+      <div class="step" data-state="RELEASE"><span>4</span>Release</div>
+    </div>
+    <div class="batch-count">
+      Batches completed <strong id="batchCount">0</strong>
+    </div>
+  </section>
+
+  <!-- One card per station, in process order -->
+  <main class="line" id="stationLine"></main>
+
+  <footer class="legend">
+    <span><i class="chip coil-on"></i> coil ON (master command)</span>
+    <span><i class="chip flag-on"></i> status flag HIGH</span>
+    <span class="note">Figures run the same step logic as the plant's Python slaves and master. Visual model only - not a live link to the bus.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

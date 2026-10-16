@@ -7,42 +7,82 @@ networks:
     ipam:
       config:
         - subnet: 172.20.0.0/24
-  webui:
-    driver: bridge
 
 services:
-  modbus-slave:
-    build: ./slave
-    container_name: modbus-slave
-    hostname: mobus-slave
+  conveyor:
+    build: ./simulation/slaves
+    container_name: conveyor
+    hostname: conveyor
+    command: ["python", "conveyor.py"]
     networks:
       otlab:
         ipv4_address: 172.20.0.10
     restart: unless-stopped
 
-  modbus-master:
-    build: ./master
-    container_name: modbus-master
-    hostname: modbus-master
+  temperature:
+    build: ./simulation/slaves
+    container_name: temperature
+    hostname: temperature
+    command: ["python", "temperature.py"]
     networks:
       otlab:
         ipv4_address: 172.20.0.11
-      webui:
-    ports:
-      - "8080:8080"
+    restart: unless-stopped
+
+  heater:
+    build: ./simulation/slaves
+    container_name: heater
+    hostname: heater
+    command: ["python", "heater.py"]
+    networks:
+      otlab:
+        ipv4_address: 172.20.0.12
+    restart: unless-stopped
+
+  pressure:
+    build: ./simulation/slaves
+    container_name: pressure
+    hostname: pressure
+    command: ["python", "pressure.py"]
+    networks:
+      otlab:
+        ipv4_address: 172.20.0.13
+    restart: unless-stopped
+
+  relief:
+    build: ./simulation/slaves
+    container_name: relief
+    hostname: relief
+    command: ["python", "relief.py"]
+    networks:
+      otlab:
+        ipv4_address: 172.20.0.14
+    restart: unless-stopped
+
+  master:
+    build: ./simulation/masters
+    container_name: master
+    hostname: master
+    networks:
+      otlab:
+        ipv4_address: 172.20.0.20
     depends_on:
-      - modbus-slave
+      - conveyor
+      - temperature
+      - heater
+      - pressure
+      - relief
     restart: unless-stopped
 
   attacker:
-    build: ./attacker
+    build: ./attack
     container_name: attacker
     hostname: attacker
     networks:
       otlab:
-        ipv4_address: 172.20.0.12
+        ipv4_address: 172.20.0.30
     depends_on:
-      - modbus-slave
+      - conveyor
     tty: true
     stdin_open: true
 
@@ -54,12 +94,11 @@ services:
       - NET_RAW
       - NET_ADMIN
     volumes:
-      - ./zeek/logs:/logs
-      - ./zeek/local.zeek:/usr/local/zeek/share/zeek/site/local.zeek:ro
-      - ./zeek/scripts:/usr/local/zeek/share/zeek/site/scripts:ro
+      - ./detection/zeek/logs:/logs
+      - ./detection/zeek/local.zeek:/usr/local/zeek/share/zeek/site/local.zeek:ro
+      - ./detection/zeek/recon-detect.zeek:/usr/local/zeek/share/zeek/site/recon-detect.zeek:ro
     working_dir: /logs
     command: ["zeek", "-C", "-i", "br-otlab", "local"]
     depends_on:
-      - modbus-master
-      - modbus-slave
+      - master
     restart: unless-stopped
